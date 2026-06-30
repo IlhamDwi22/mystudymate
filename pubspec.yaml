@@ -39,6 +39,8 @@ dependencies:
   google_fonts: ^6.3.0
   intl: ^0.20.2
   uuid: ^4.5.1
+  file_picker: ^11.0.2
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
@@ -64,6 +66,8 @@ flutter:
 
   assets:
     - .env
+    - assets/images/logo_myStudyMate.png
+
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
