@@ -674,7 +674,9 @@ class _EditProfileBottomSheetState extends ConsumerState<_EditProfileBottomSheet
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   String? _selectedMajor;
-  int? _selectedSemester;
+  String? _customMajor;
+  String? _selectedSemester;
+  String? _customSemester;
   bool _isSaving = false;
 
   final List<String> _majors = [
@@ -682,21 +684,29 @@ class _EditProfileBottomSheetState extends ConsumerState<_EditProfileBottomSheet
     'D4 Teknik Rekayasa Komputer',
     'D3 Akuntansi',
     'D4 Administrasi Bisnis',
+    'Lainnya (Ketik sendiri)',
   ];
 
-  final List<int> _semesters = [1, 2, 3, 4, 5, 6, 7, 8];
+  final List<String> _semesters = ['1', '2', '3', '4', '5', '6', '7', '8', 'Lainnya (Ketik sendiri)'];
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.profile.fullName);
     
-    // Fallback to pre-existing major/semester if valid, otherwise keep null to force selection or preselect
     if (_majors.contains(widget.profile.major)) {
       _selectedMajor = widget.profile.major;
+    } else if (widget.profile.major.isNotEmpty) {
+      _selectedMajor = 'Lainnya (Ketik sendiri)';
+      _customMajor = widget.profile.major;
     }
-    if (_semesters.contains(widget.profile.semester)) {
-      _selectedSemester = widget.profile.semester;
+
+    final semStr = widget.profile.semester.toString();
+    if (_semesters.contains(semStr)) {
+      _selectedSemester = semStr;
+    } else if (widget.profile.semester > 0) {
+      _selectedSemester = 'Lainnya (Ketik sendiri)';
+      _customSemester = semStr;
     }
   }
 
@@ -710,10 +720,14 @@ class _EditProfileBottomSheetState extends ConsumerState<_EditProfileBottomSheet
     if (_formKey.currentState?.validate() ?? false) {
       setState(() => _isSaving = true);
       try {
+        final finalMajor = _selectedMajor == 'Lainnya (Ketik sendiri)' ? _customMajor! : _selectedMajor!;
+        final finalSemesterStr = _selectedSemester == 'Lainnya (Ketik sendiri)' ? _customSemester! : _selectedSemester!;
+        final finalSemester = int.tryParse(finalSemesterStr) ?? 1;
+
         await ref.read(userProfileProvider.notifier).updateProfile(
               fullName: _nameController.text.trim(),
-              major: _selectedMajor!,
-              semester: _selectedSemester!,
+              major: finalMajor,
+              semester: finalSemester,
             );
         if (mounted) {
           Navigator.pop(context);
@@ -797,6 +811,7 @@ class _EditProfileBottomSheetState extends ConsumerState<_EditProfileBottomSheet
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
+              isExpanded: true,
               decoration: InputDecoration(
                 hintText: 'Pilih program studi',
                 filled: true,
@@ -813,9 +828,26 @@ class _EditProfileBottomSheetState extends ConsumerState<_EditProfileBottomSheet
                   child: Text(major),
                 );
               }).toList(),
-              onChanged: (val) => setState(() => _selectedMajor = val),
+              onChanged: (val) => setState(() {
+                _selectedMajor = val;
+                if (val != 'Lainnya (Ketik sendiri)') _customMajor = null;
+              }),
               validator: (val) => val == null ? 'Pilih program studi' : null,
             ),
+            if (_selectedMajor == 'Lainnya (Ketik sendiri)') ...[
+              const SizedBox(height: 12),
+              TextFormField(
+                initialValue: _customMajor,
+                decoration: InputDecoration(
+                  hintText: 'Ketik program studi Anda...',
+                  filled: true,
+                  fillColor: const Color(0xFFF0F4FF),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                ),
+                onChanged: (val) => _customMajor = val,
+                validator: (val) => (val == null || val.trim().isEmpty) ? 'Harap ketik program studi' : null,
+              ),
+            ],
             const SizedBox(height: 16),
 
             // Semester field
@@ -824,7 +856,8 @@ class _EditProfileBottomSheetState extends ConsumerState<_EditProfileBottomSheet
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            DropdownButtonFormField<int>(
+            DropdownButtonFormField<String>(
+              isExpanded: true,
               decoration: InputDecoration(
                 hintText: 'Pilih semester',
                 filled: true,
@@ -838,12 +871,30 @@ class _EditProfileBottomSheetState extends ConsumerState<_EditProfileBottomSheet
               items: _semesters.map((sem) {
                 return DropdownMenuItem(
                   value: sem,
-                  child: Text('Semester $sem'),
+                  child: Text(sem == 'Lainnya (Ketik sendiri)' ? sem : 'Semester $sem'),
                 );
               }).toList(),
-              onChanged: (val) => setState(() => _selectedSemester = val),
+              onChanged: (val) => setState(() {
+                _selectedSemester = val;
+                if (val != 'Lainnya (Ketik sendiri)') _customSemester = null;
+              }),
               validator: (val) => val == null ? 'Pilih semester' : null,
             ),
+            if (_selectedSemester == 'Lainnya (Ketik sendiri)') ...[
+              const SizedBox(height: 12),
+              TextFormField(
+                initialValue: _customSemester,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  hintText: 'Ketik semester (Angka)...',
+                  filled: true,
+                  fillColor: const Color(0xFFF0F4FF),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                ),
+                onChanged: (val) => _customSemester = val,
+                validator: (val) => (val == null || val.trim().isEmpty) ? 'Harap ketik semester' : null,
+              ),
+            ],
             const SizedBox(height: 24),
 
             ElevatedButton(
@@ -893,12 +944,22 @@ class _ManageCoursesBottomSheet extends ConsumerStatefulWidget {
 
 class _ManageCoursesBottomSheetState extends ConsumerState<_ManageCoursesBottomSheet> {
   final _addFormKey = GlobalKey<FormState>();
-  final _courseNameController = TextEditingController();
+  final _customCourseController = TextEditingController();
+  String? _selectedCourse;
   bool _isAdding = false;
+  
+  final List<String> _predefinedCourses = [
+    'Kecerdasan Buatan',
+    'Basis Data',
+    'Pemrograman Mobile',
+    'Jaringan Komputer',
+    'Pemrograman Web',
+    'Lainnya (Ketik sendiri)',
+  ];
 
   @override
   void dispose() {
-    _courseNameController.dispose();
+    _customCourseController.dispose();
     super.dispose();
   }
 
@@ -906,9 +967,12 @@ class _ManageCoursesBottomSheetState extends ConsumerState<_ManageCoursesBottomS
     if (_addFormKey.currentState?.validate() ?? false) {
       setState(() => _isAdding = true);
       try {
-        final courseName = _courseNameController.text.trim();
+        final courseName = _selectedCourse == 'Lainnya (Ketik sendiri)' 
+            ? _customCourseController.text.trim() 
+            : _selectedCourse!;
         await ref.read(userCoursesProvider.notifier).addCourse(courseName);
-        _courseNameController.clear();
+        _customCourseController.clear();
+        setState(() => _selectedCourse = null);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -1011,13 +1075,35 @@ class _ManageCoursesBottomSheetState extends ConsumerState<_ManageCoursesBottomS
           // Form to add course
           Form(
             key: _addFormKey,
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _courseNameController,
+                DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    hintText: 'Pilih mata kuliah',
+                    filled: true,
+                    fillColor: const Color(0xFFF0F4FF),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  ),
+                  value: _selectedCourse,
+                  items: _predefinedCourses.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                  onChanged: (val) => setState(() {
+                    _selectedCourse = val;
+                    if (val != 'Lainnya (Ketik sendiri)') _customCourseController.clear();
+                  }),
+                  validator: (val) => val == null ? 'Silakan pilih mata kuliah' : null,
+                ),
+                if (_selectedCourse == 'Lainnya (Ketik sendiri)') ...[
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _customCourseController,
                     decoration: InputDecoration(
-                      hintText: 'Nama mata kuliah baru',
+                      hintText: 'Ketik nama mata kuliah...',
                       filled: true,
                       fillColor: const Color(0xFFF0F4FF),
                       border: OutlineInputBorder(
@@ -1030,8 +1116,8 @@ class _ManageCoursesBottomSheetState extends ConsumerState<_ManageCoursesBottomS
                         ? 'Nama mata kuliah tidak boleh kosong'
                         : null,
                   ),
-                ),
-                const SizedBox(width: 12),
+                ],
+                const SizedBox(height: 12),
                 ElevatedButton(
                   onPressed: _isAdding ? null : _addCourse,
                   style: ElevatedButton.styleFrom(
@@ -1039,7 +1125,7 @@ class _ManageCoursesBottomSheetState extends ConsumerState<_ManageCoursesBottomS
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   child: _isAdding
                       ? const SizedBox(
@@ -1051,7 +1137,7 @@ class _ManageCoursesBottomSheetState extends ConsumerState<_ManageCoursesBottomS
                           ),
                         )
                       : const Text(
-                          'Add',
+                          'Tambah Mata Kuliah',
                           style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
                         ),
                 ),

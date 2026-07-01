@@ -89,7 +89,7 @@ class NotesNotifier extends StateNotifier<AsyncValue<List<Note>>> {
 
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
-      await _repository.deleteNote(id);
+      await _repository.deleteNote(userId, id);
       return await _repository.getNotes(userId);
     });
   }

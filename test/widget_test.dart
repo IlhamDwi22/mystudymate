@@ -96,6 +96,8 @@ class MockWorkspaceRepository implements WorkspaceRepository {
   @override
   Future<void> inviteMemberByName(String workspaceId, String fullName) async {}
   @override
+  Future<void> inviteMemberById(String workspaceId, String userId) async {}
+  @override
   Future<void> removeMember(String workspaceId, String userId) async {}
   @override
   Future<void> deleteWorkspace(String workspaceId) async {}
@@ -184,7 +186,7 @@ void main() {
     );
 
     await tester.pump();
-    expect(find.text('Belum Ada Workspace'), findsOneWidget);
+    expect(find.text('No Workspace Yet'), findsOneWidget);
   });
 
   testWidgets('WorkspaceScreen open bottom sheet test', (WidgetTester tester) async {
@@ -308,7 +310,7 @@ class MockNotesRepository implements NotesRepository {
   Future<Note> updateNote(Note note) async => throw UnimplementedError();
 
   @override
-  Future<void> deleteNote(String id) async {}
+  Future<void> deleteNote(String userId, String id) async {}
 }
 
 class MockNotesNotifier extends NotesNotifier {

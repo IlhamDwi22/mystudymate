@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../profile/providers/profile_provider.dart';
 import '../providers/matchmaking_provider.dart';
+import '../providers/friend_provider.dart';
 import '../models/study_mate_match.dart';
 
 class StudyMateResultsScreen extends ConsumerWidget {
@@ -387,18 +388,32 @@ class StudyMateResultsScreen extends ConsumerWidget {
   }
 }
 
-class _PartnerDetailBottomSheet extends StatelessWidget {
+class _PartnerDetailBottomSheet extends ConsumerWidget {
   final StudyMateMatch match;
 
   const _PartnerDetailBottomSheet({required this.match});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final initials = match.profile.fullName.isNotEmpty
         ? match.profile.fullName.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
         : 'M';
     final nameHash = match.profile.fullName.codeUnits.fold(0, (prev, elem) => prev + elem);
     final avatarColor = Colors.primaries[nameHash % Colors.primaries.length];
+
+    final sentStatuses = ref.watch(sentRequestStatusesProvider);
+    final friendsState = ref.watch(friendsListProvider);
+
+    String? sentStatus;
+    bool isFriend = false;
+
+    sentStatuses.whenData((statuses) {
+      sentStatus = statuses[match.profile.id];
+    });
+
+    friendsState.whenData((friends) {
+      isFriend = friends.any((f) => f.id == match.profile.id);
+    });
 
     return SingleChildScrollView(
       child: Padding(
@@ -577,33 +592,75 @@ class _PartnerDetailBottomSheet extends StatelessWidget {
             const SizedBox(height: 32),
 
             // Call to Action
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 52),
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              onPressed: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Mengirim permintaan belajar ke ${match.profile.fullName}!'),
-                    backgroundColor: AppColors.primary,
-                  ),
-                );
-              },
-              icon: const Icon(Icons.chat_bubble_outline),
-              label: const Text(
-                'Undang Belajar Bersama',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
+            _buildActionButton(context, ref, isFriend, sentStatus),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildActionButton(BuildContext context, WidgetRef ref, bool isFriend, String? sentStatus) {
+    if (isFriend || sentStatus == 'accepted') {
+      return ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(
+          minimumSize: const Size(double.infinity, 52),
+          backgroundColor: AppColors.success,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+        onPressed: null,
+        icon: const Icon(Icons.check_circle),
+        label: const Text('Already Study Mates ✓', style: TextStyle(fontWeight: FontWeight.bold)),
+      );
+    }
+
+    if (sentStatus == 'pending') {
+      return ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(
+          minimumSize: const Size(double.infinity, 52),
+          backgroundColor: Colors.grey.shade400,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+        onPressed: null,
+        icon: const Icon(Icons.hourglass_top),
+        label: const Text('Invitation Sent', style: TextStyle(fontWeight: FontWeight.bold)),
+      );
+    }
+
+    return ElevatedButton.icon(
+      style: ElevatedButton.styleFrom(
+        minimumSize: const Size(double.infinity, 52),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+      onPressed: () async {
+        try {
+          await ref.read(friendRepositoryProvider).sendFriendRequest(match.profile.id);
+          ref.invalidate(sentRequestStatusesProvider);
+          if (context.mounted) {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Invitation sent to ${match.profile.fullName}!'),
+                backgroundColor: AppColors.primary,
+              ),
+            );
+          }
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to send invitation: $e'),
+                backgroundColor: AppColors.error,
+              ),
+            );
+          }
+        }
+      },
+      icon: const Icon(Icons.person_add_alt_1),
+      label: const Text('Undang Belajar Bersama', style: TextStyle(fontWeight: FontWeight.bold)),
     );
   }
 }

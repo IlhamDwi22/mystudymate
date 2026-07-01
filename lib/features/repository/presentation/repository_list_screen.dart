@@ -16,8 +16,7 @@ class RepositoryListScreen extends ConsumerStatefulWidget {
 class _RepositoryListScreenState extends ConsumerState<RepositoryListScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  String? _selectedCourse;
-  int? _selectedSemester;
+
 
   @override
   void initState() {
@@ -113,74 +112,7 @@ class _RepositoryListScreenState extends ConsumerState<RepositoryListScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Filter Selectors Row
-              Row(
-                children: [
-                  // Semester Filter Dropdown
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<int?>(
-                          value: _selectedSemester,
-                          hint: const Text('Semester', style: TextStyle(fontSize: 13, color: AppColors.textLight)),
-                          icon: const Icon(Icons.keyboard_arrow_down, size: 18),
-                          isExpanded: true,
-                          items: [
-                            const DropdownMenuItem(value: null, child: Text('Semua', style: TextStyle(fontSize: 13))),
-                            for (int s = 1; s <= 8; s++)
-                              DropdownMenuItem(value: s, child: Text('Semester $s', style: TextStyle(fontSize: 13))),
-                          ],
-                          onChanged: (val) {
-                            setState(() {
-                              _selectedSemester = val;
-                            });
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
 
-                  // Course Filter Dropdown
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String?>(
-                          value: _selectedCourse,
-                          hint: const Text('Mata Kuliah', style: TextStyle(fontSize: 13, color: AppColors.textLight)),
-                          icon: const Icon(Icons.keyboard_arrow_down, size: 18),
-                          isExpanded: true,
-                          items: const [
-                            DropdownMenuItem(value: null, child: Text('Semua', style: TextStyle(fontSize: 13))),
-                            DropdownMenuItem(value: 'Database System', child: Text('Database', style: TextStyle(fontSize: 13))),
-                            DropdownMenuItem(value: 'Artificial Intelligence', child: Text('AI', style: TextStyle(fontSize: 13))),
-                            DropdownMenuItem(value: 'Technopreneurship', child: Text('Technopreneur', style: TextStyle(fontSize: 13))),
-                            DropdownMenuItem(value: 'Project Based Learning', child: Text('PBL', style: TextStyle(fontSize: 13))),
-                          ],
-                          onChanged: (val) {
-                            setState(() {
-                              _selectedCourse = val;
-                            });
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
 
               // Files Listing
               Expanded(
@@ -191,35 +123,7 @@ class _RepositoryListScreenState extends ConsumerState<RepositoryListScreen> {
                       final matchesSearch = f.title.toLowerCase().contains(_searchQuery) ||
                           f.courseName.toLowerCase().contains(_searchQuery);
                       
-                      // For semester filtering, we can check courseName keywords (e.g. AI is Semester 4) 
-                      // or map files. Here we mock semester checks:
-                      bool matchesSemester = true;
-                      if (_selectedSemester != null) {
-                        final courseLower = f.courseName.toLowerCase();
-                        if (_selectedSemester == 4) {
-                          matchesSemester = courseLower.contains('ai') ||
-                              courseLower.contains('artificial') ||
-                              courseLower.contains('pbl') ||
-                              courseLower.contains('database') ||
-                              courseLower.contains('basis data');
-                        } else if (_selectedSemester == 2) {
-                          matchesSemester = courseLower.contains('algoritma') || courseLower.contains('pemrograman');
-                        } else {
-                          // Default filter fallback for mockup simulation
-                          matchesSemester = f.id.hashCode % 2 == 0;
-                        }
-                      }
-
-                      bool matchesCourse = true;
-                      if (_selectedCourse != null) {
-                        final cName = f.courseName.toLowerCase();
-                        final selName = _selectedCourse!.toLowerCase();
-                        matchesCourse = cName.contains(selName) ||
-                            (selName.contains('database') && cName.contains('basis data')) ||
-                            (selName.contains('pbl') && cName.contains('project'));
-                      }
-
-                      return matchesSearch && matchesSemester && matchesCourse;
+                      return matchesSearch;
                     }).toList();
 
                     if (filteredFiles.isEmpty) {
@@ -416,7 +320,7 @@ class _RepositoryListScreenState extends ConsumerState<RepositoryListScreen> {
             Text(
               isDatabaseEmpty
                   ? 'Mulai unggah berkas PDF modul kuliah atau ringkasan materi untuk membagikannya ke teman belajar.'
-                  : 'Coba sesuaikan kata kunci pencarian atau filter semester / mata kuliah Anda.',
+                  : 'Coba sesuaikan kata kunci pencarian Anda.',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 13,

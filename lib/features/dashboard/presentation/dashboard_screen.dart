@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../profile/providers/profile_provider.dart';
+import '../providers/dashboard_provider.dart';
+import '../data/dashboard_repository.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -12,9 +15,12 @@ class DashboardScreen extends ConsumerWidget {
     final profileState = ref.watch(userProfileProvider);
     final profile = profileState.value;
     
-    // Fallback to "Ilham" as shown in the mockup if profile full_name is empty or not loaded yet.
-    final String fullName = profile?.fullName ?? 'Ilham';
+    final statsState = ref.watch(dashboardStatsProvider);
+    
+    // Fallback to "User" if profile full_name is empty or not loaded yet.
+    final String fullName = profile?.fullName ?? 'User';
     final String displayName = fullName.split(' ').first;
+    final String initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -28,10 +34,15 @@ class DashboardScreen extends ConsumerWidget {
           children: [
             CircleAvatar(
               radius: 22,
-              backgroundImage: const NetworkImage(
-                'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=200',
+              backgroundColor: AppColors.primary,
+              child: Text(
+                initial,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-              backgroundColor: Colors.grey[200],
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -87,11 +98,7 @@ class DashboardScreen extends ConsumerWidget {
                 size: 26,
               ),
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Fitur Notifikasi akan hadir di Sprint berikutnya!'),
-                  ),
-                );
+                _showNotificationSheet(context, statsState.value?.upcomingDeadlines ?? []);
               },
             ),
           ),
@@ -116,14 +123,14 @@ class DashboardScreen extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      children: [
-                        const Icon(
+                      children: const [
+                        Icon(
                           Icons.check_circle_outline,
                           color: AppColors.primary,
                           size: 22,
                         ),
-                        const SizedBox(width: 8),
-                        const Text(
+                        SizedBox(width: 8),
+                        Text(
                           'Active Tasks',
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
@@ -134,13 +141,17 @@ class DashboardScreen extends ConsumerWidget {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    const Text(
-                      '8',
-                      style: TextStyle(
-                        fontSize: 36,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF98BBFF), // Soft light blue from the mockup
+                    statsState.when(
+                      data: (stats) => Text(
+                        '${stats.activeTasks}',
+                        style: const TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF98BBFF), 
+                        ),
                       ),
+                      loading: () => const CircularProgressIndicator(),
+                      error: (_, __) => const Text('-', style: TextStyle(fontSize: 36)),
                     ),
                   ],
                 ),
@@ -162,14 +173,14 @@ class DashboardScreen extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
-                            children: [
-                              const Icon(
+                            children: const [
+                              Icon(
                                 Icons.warning_amber_rounded,
                                 color: AppColors.error,
                                 size: 22,
                               ),
-                              const SizedBox(width: 8),
-                              const Expanded(
+                              SizedBox(width: 8),
+                              Expanded(
                                 child: Text(
                                   'Due This Week',
                                   style: TextStyle(
@@ -184,13 +195,17 @@ class DashboardScreen extends ConsumerWidget {
                             ],
                           ),
                           const SizedBox(height: 12),
-                          const Text(
-                            '3',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.error,
+                          statsState.when(
+                            data: (stats) => Text(
+                              '${stats.dueThisWeek}',
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.error,
+                              ),
                             ),
+                            loading: () => const CircularProgressIndicator(),
+                            error: (_, __) => const Text('-', style: TextStyle(fontSize: 28)),
                           ),
                         ],
                       ),
@@ -209,14 +224,14 @@ class DashboardScreen extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
-                            children: [
-                              const Icon(
+                            children: const [
+                              Icon(
                                 Icons.hub_outlined,
                                 color: Color(0xFFD97706),
                                 size: 22,
                               ),
-                              const SizedBox(width: 8),
-                              const Expanded(
+                              SizedBox(width: 8),
+                              Expanded(
                                 child: Text(
                                   'Joined Workspaces',
                                   style: TextStyle(
@@ -231,13 +246,17 @@ class DashboardScreen extends ConsumerWidget {
                             ],
                           ),
                           const SizedBox(height: 12),
-                          const Text(
-                            '4',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFFFBBF24),
+                          statsState.when(
+                            data: (stats) => Text(
+                              '${stats.joinedWorkspaces}',
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFFBBF24),
+                              ),
                             ),
+                            loading: () => const CircularProgressIndicator(),
+                            error: (_, __) => const Text('-', style: TextStyle(fontSize: 28)),
                           ),
                         ],
                       ),
@@ -342,81 +361,170 @@ class DashboardScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 16),
                     
-                    // Task 1: Database Project Report
-                    _buildDeadlineTaskItem(
-                      tagText: 'HIGH PRIORITY',
-                      tagBgColor: const Color(0xFFFEE2E2),
-                      tagTextColor: const Color(0xFFEF4444),
-                      dueText: 'Due Tomorrow',
-                      dueColor: const Color(0xFFEF4444),
-                      title: 'Database Project Report',
-                      workspaceName: 'PBL Semester 4',
-                      accentColor: const Color(0xFFEF4444),
-                      bgColor: const Color(0xFFFEF2F2),
-                      borderColor: const Color(0xFFFEE2E2),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Task 2: AI Presentation
-                    _buildDeadlineTaskItem(
-                      tagText: 'MEDIUM PRIORITY',
-                      tagBgColor: const Color(0xFFDBEAFE),
-                      tagTextColor: const Color(0xFF3B82F6),
-                      dueText: 'Due in 3 Days',
-                      dueColor: AppColors.textLight,
-                      title: 'AI Presentation',
-                      workspaceName: 'Artificial Intelligence',
-                      accentColor: const Color(0xFF3B82F6),
-                      bgColor: const Color(0xFFEFF6FF),
-                      borderColor: const Color(0xFFDBEAFE),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Inner FAB Align
-                    Align(
-                      alignment: Alignment.bottomRight,
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withAlpha(76),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(12),
-                            onTap: () {
-                              context.go('/workspace');
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Pilih Workspace untuk menambahkan tugas baru.'),
+                    statsState.when(
+                      data: (stats) {
+                        if (stats.upcomingDeadlines.isEmpty) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 24.0),
+                            child: Center(
+                              child: Text(
+                                'No upcoming deadlines soon! 🎉',
+                                style: TextStyle(
+                                  color: AppColors.textLight,
+                                  fontStyle: FontStyle.italic,
                                 ),
-                              );
-                            },
-                            child: const Icon(
-                              Icons.add,
-                              color: Colors.white,
-                              size: 24,
+                              ),
                             ),
-                          ),
-                        ),
-                      ),
+                          );
+                        }
+                        
+                        return Column(
+                          children: stats.upcomingDeadlines.map((item) {
+                            final now = DateTime.now();
+                            final today = DateTime(now.year, now.month, now.day);
+                            final deadline = item.task.deadline!;
+                            final taskDate = DateTime(deadline.year, deadline.month, deadline.day);
+                            final difference = taskDate.difference(today).inDays;
+                            
+                            String tagText = 'HIGH PRIORITY';
+                            Color tagBgColor = const Color(0xFFFEE2E2);
+                            Color tagTextColor = const Color(0xFFEF4444);
+                            String dueText;
+                            Color dueColor = const Color(0xFFEF4444);
+                            Color accentColor = const Color(0xFFEF4444);
+                            Color bgColor = const Color(0xFFFEF2F2);
+                            Color borderColor = const Color(0xFFFEE2E2);
+                            
+                            if (difference < 0) {
+                              dueText = 'Overdue by ${difference.abs()} days';
+                            } else if (difference == 0) {
+                              dueText = 'Due Today';
+                            } else if (difference == 1) {
+                              dueText = 'Due Tomorrow';
+                            } else {
+                              dueText = 'Due in $difference Days';
+                              if (difference > 1) {
+                                tagText = 'MEDIUM PRIORITY';
+                                tagBgColor = const Color(0xFFDBEAFE);
+                                tagTextColor = const Color(0xFF3B82F6);
+                                dueColor = AppColors.textLight;
+                                accentColor = const Color(0xFF3B82F6);
+                                bgColor = const Color(0xFFEFF6FF);
+                                borderColor = const Color(0xFFDBEAFE);
+                              }
+                            }
+                            
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12.0),
+                              child: _buildDeadlineTaskItem(
+                                tagText: tagText,
+                                tagBgColor: tagBgColor,
+                                tagTextColor: tagTextColor,
+                                dueText: dueText,
+                                dueColor: dueColor,
+                                title: item.task.title,
+                                workspaceName: item.workspaceName,
+                                accentColor: accentColor,
+                                bgColor: bgColor,
+                                borderColor: borderColor,
+                              ),
+                            );
+                          }).toList(),
+                        );
+                      },
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (_, __) => const Center(child: Text('Gagal memuat tasks')),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(height: 24),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  void _showNotificationSheet(BuildContext context, List<TaskWithWorkspace> deadlines) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Notifications',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textDark,
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (deadlines.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32.0),
+                  child: Center(
+                    child: Text(
+                      'Belum ada notifikasi baru',
+                      style: TextStyle(
+                        color: AppColors.textLight,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Expanded(
+                  child: ListView.separated(
+                    itemCount: deadlines.length,
+                    separatorBuilder: (context, index) => const Divider(),
+                    itemBuilder: (context, index) {
+                      final item = deadlines[index];
+                      final deadlineStr = DateFormat('dd MMM yyyy').format(item.task.deadline!);
+                      return ListTile(
+                        leading: const CircleAvatar(
+                          backgroundColor: Color(0xFFFEF2F2),
+                          child: Icon(Icons.warning_amber_rounded, color: AppColors.error),
+                        ),
+                        title: Text(
+                          item.task.title,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          'Mendekati deadline: $deadlineStr\nWorkspace: ${item.workspaceName}',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        isThreeLine: true,
+                        onTap: () {
+                          Navigator.pop(context);
+                          context.go('/workspace'); // Navigate to workspace on tap
+                        },
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -585,3 +693,4 @@ class DashboardScreen extends ConsumerWidget {
     );
   }
 }
+

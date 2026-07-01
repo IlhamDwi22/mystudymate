@@ -21,6 +21,7 @@ class _EditNoteScreenState extends ConsumerState<EditNoteScreen> {
   late TextEditingController _titleController;
   late TextEditingController _contentController;
   String? _selectedCourse;
+  String? _customCourse;
   bool _isSaving = false;
   bool _isDeleting = false;
 
@@ -29,6 +30,7 @@ class _EditNoteScreenState extends ConsumerState<EditNoteScreen> {
     'Artificial Intelligence',
     'Technopreneurship',
     'Project Based Learning',
+    'Lainnya (Ketik sendiri)',
   ];
 
   @override
@@ -36,7 +38,16 @@ class _EditNoteScreenState extends ConsumerState<EditNoteScreen> {
     super.initState();
     _titleController = TextEditingController(text: widget.note?.title ?? '');
     _contentController = TextEditingController(text: widget.note?.content ?? '');
-    _selectedCourse = widget.note?.courseName;
+    
+    final noteCourse = widget.note?.courseName;
+    if (noteCourse != null) {
+      if (_courses.contains(noteCourse)) {
+        _selectedCourse = noteCourse;
+      } else {
+        _selectedCourse = 'Lainnya (Ketik sendiri)';
+        _customCourse = noteCourse;
+      }
+    }
   }
 
   @override
@@ -56,11 +67,13 @@ class _EditNoteScreenState extends ConsumerState<EditNoteScreen> {
       final scaffoldMessenger = ScaffoldMessenger.of(context);
 
       try {
+        final finalCourse = _selectedCourse == 'Lainnya (Ketik sendiri)' ? _customCourse! : _selectedCourse!;
+        
         if (widget.note == null) {
           // Create Mode
           await ref.read(notesProvider.notifier).createNote(
                 title: _titleController.text.trim(),
-                courseName: _selectedCourse!,
+                courseName: finalCourse,
                 content: _contentController.text.trim(),
               );
         } else {
@@ -68,7 +81,7 @@ class _EditNoteScreenState extends ConsumerState<EditNoteScreen> {
           await ref.read(notesProvider.notifier).updateNote(
                 id: widget.note!.id,
                 title: _titleController.text.trim(),
-                courseName: _selectedCourse!,
+                courseName: finalCourse,
                 content: _contentController.text.trim(),
               );
         }
@@ -218,6 +231,7 @@ class _EditNoteScreenState extends ConsumerState<EditNoteScreen> {
 
                 // 2. Course Dropdown Selector
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   decoration: const InputDecoration(
                     fillColor: Color(0xFFF8FAFC),
                     filled: true,
@@ -237,6 +251,7 @@ class _EditNoteScreenState extends ConsumerState<EditNoteScreen> {
                       : (val) {
                           setState(() {
                             _selectedCourse = val;
+                            if (val != 'Lainnya (Ketik sendiri)') _customCourse = null;
                           });
                         },
                   validator: (value) {
@@ -246,6 +261,21 @@ class _EditNoteScreenState extends ConsumerState<EditNoteScreen> {
                     return null;
                   },
                 ),
+                if (_selectedCourse == 'Lainnya (Ketik sendiri)') ...[
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    initialValue: _customCourse,
+                    enabled: !_isSaving && !_isDeleting,
+                    decoration: const InputDecoration(
+                      hintText: 'Ketik nama mata kuliah...',
+                      fillColor: Color(0xFFF8FAFC),
+                      filled: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                    onChanged: (val) => _customCourse = val,
+                    validator: (val) => (val == null || val.trim().isEmpty) ? 'Mata kuliah tidak boleh kosong' : null,
+                  ),
+                ],
                 const SizedBox(height: 20),
 
                 // 3. Content Text Area

@@ -57,4 +57,16 @@ class Note {
       'user_id': userId,
     };
   }
+
+  Map<String, dynamic> toLocalJson() {
+    return {
+      'id': id,
+      'user_id': userId,
+      'course_name': courseName,
+      'title': title,
+      'content': content,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
 }

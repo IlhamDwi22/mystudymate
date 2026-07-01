@@ -15,23 +15,31 @@ class CompleteProfileScreen extends ConsumerStatefulWidget {
 class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   String? _selectedMajor;
-  int? _selectedSemester;
+  String? _customMajor;
+  String? _selectedSemester;
+  String? _customSemester;
+
   final List<String> _majors = [
     'D3 Teknik Informatika',
     'D4 Teknik Rekayasa Komputer',
     'D3 Akuntansi',
     'D4 Administrasi Bisnis',
+    'Lainnya (Ketik sendiri)',
   ];
 
-  final List<int> _semesters = [1, 2, 3, 4, 5, 6, 7, 8];
+  final List<String> _semesters = ['1', '2', '3', '4', '5', '6', '7', '8', 'Lainnya (Ketik sendiri)'];
 
   void _submit() async {
     if (_formKey.currentState?.validate() ?? false) {
+      final majorToSave = _selectedMajor == 'Lainnya (Ketik sendiri)' ? _customMajor! : _selectedMajor!;
+      final semesterToSave = _selectedSemester == 'Lainnya (Ketik sendiri)' ? _customSemester! : _selectedSemester!;
+      final semInt = int.tryParse(semesterToSave) ?? 1;
+
       await ref
           .read(userProfileProvider.notifier)
           .completeProfile(
-            major: _selectedMajor!,
-            semester: _selectedSemester!,
+            major: majorToSave,
+            semester: semInt,
           );
     }
   }
@@ -210,6 +218,7 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                         ),
                         const SizedBox(height: 8),
                         DropdownButtonFormField<String>(
+                          isExpanded: true,
                           decoration: InputDecoration(
                             hintText: 'Select your major',
                             filled: true,
@@ -238,7 +247,6 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                             Icons.keyboard_arrow_down,
                             color: AppColors.primary,
                           ),
-                          // ignore: deprecated_member_use
                           value: _selectedMajor,
                           items: _majors.map((major) {
                             return DropdownMenuItem(
@@ -249,11 +257,28 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                           onChanged: isLoading
                               ? null
                               : (val) =>
-                                    setState(() => _selectedMajor = val),
+                                    setState(() {
+                                      _selectedMajor = val;
+                                      if (val != 'Lainnya (Ketik sendiri)') _customMajor = null;
+                                    }),
                           validator: (val) => val == null
                               ? 'Pilih program studi Anda'
                               : null,
                         ),
+                        if (_selectedMajor == 'Lainnya (Ketik sendiri)') ...[
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            decoration: InputDecoration(
+                              hintText: 'Ketik program studi Anda...',
+                              filled: true,
+                              fillColor: const Color(0xFFF0F4FF),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                            ),
+                            onChanged: (val) => _customMajor = val,
+                            validator: (val) => (val == null || val.trim().isEmpty) ? 'Harap ketik program studi' : null,
+                          ),
+                        ],
                         const SizedBox(height: 20),
                         // Dropdown 2 Label
                         Text(
@@ -265,7 +290,8 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        DropdownButtonFormField<int>(
+                        DropdownButtonFormField<String>(
+                          isExpanded: true,
                           decoration: InputDecoration(
                             hintText: 'Select semester',
                             filled: true,
@@ -294,22 +320,39 @@ class _CompleteProfileScreenState extends ConsumerState<CompleteProfileScreen> {
                             Icons.keyboard_arrow_down,
                             color: AppColors.primary,
                           ),
-                          // ignore: deprecated_member_use
                           value: _selectedSemester,
                           items: _semesters.map((semester) {
                             return DropdownMenuItem(
                               value: semester,
-                              child: Text('Semester $semester'),
+                              child: Text(semester == 'Lainnya (Ketik sendiri)' ? semester : 'Semester $semester'),
                             );
                           }).toList(),
                           onChanged: isLoading
                               ? null
                               : (val) =>
-                                    setState(() => _selectedSemester = val),
+                                    setState(() {
+                                      _selectedSemester = val;
+                                      if (val != 'Lainnya (Ketik sendiri)') _customSemester = null;
+                                    }),
                           validator: (val) => val == null
                               ? 'Pilih semester aktif Anda'
                               : null,
                         ),
+                        if (_selectedSemester == 'Lainnya (Ketik sendiri)') ...[
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              hintText: 'Ketik semester Anda (Angka)...',
+                              filled: true,
+                              fillColor: const Color(0xFFF0F4FF),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                            ),
+                            onChanged: (val) => _customSemester = val,
+                            validator: (val) => (val == null || val.trim().isEmpty) ? 'Harap ketik semester' : null,
+                          ),
+                        ],
                         const SizedBox(height: 36),
                         ElevatedButton(
                           onPressed: isLoading ? null : _submit,

@@ -16,6 +16,7 @@ import '../../features/profile/presentation/profile_screen.dart';
 import '../presentation/main_screen.dart';
 import '../../features/matchmaking/presentation/study_mate_search_screen.dart';
 import '../../features/matchmaking/presentation/study_mate_results_screen.dart';
+import '../../features/matchmaking/presentation/friend_requests_screen.dart';
 
 class GoRouterRefreshNotifier extends ChangeNotifier {
   void refresh() => notifyListeners();
@@ -167,6 +168,10 @@ final routerProvider = Provider<GoRouter>((ref) {
                             selectedCourse: extra['course'] as String?,
                           );
                         },
+                      ),
+                      GoRoute(
+                        path: 'friend-requests',
+                        builder: (context, state) => const FriendRequestsScreen(),
                       ),
                     ],
                   ),

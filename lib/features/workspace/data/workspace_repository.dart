@@ -269,6 +269,30 @@ class WorkspaceRepository {
     debugPrint('[WorkspaceRepository] inviteMemberByName direct insert success');
   }
 
+  /// Invite a member to the workspace by their ID
+  Future<void> inviteMemberById(String workspaceId, String userId) async {
+    debugPrint('[WorkspaceRepository] inviteMemberById called: workspaceId="$workspaceId", userId="$userId"');
+
+    // Check if already a member
+    final existingMember = await _supabase
+        .from('workspace_members')
+        .select()
+        .eq('workspace_id', workspaceId)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+    if (existingMember != null) {
+      throw Exception('Pengguna sudah menjadi anggota workspace ini.');
+    }
+
+    // Insert membership
+    await _supabase.from('workspace_members').insert({
+      'workspace_id': workspaceId,
+      'user_id': userId,
+    });
+    debugPrint('[WorkspaceRepository] inviteMemberById direct insert success');
+  }
+
   /// Remove a member from the workspace
   Future<void> removeMember(String workspaceId, String userId) async {
     debugPrint('[WorkspaceRepository] removeMember called: workspaceId="$workspaceId", userId="$userId"');

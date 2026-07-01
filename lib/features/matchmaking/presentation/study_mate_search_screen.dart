@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../profile/providers/profile_provider.dart';
 import '../providers/matchmaking_provider.dart';
+import '../providers/friend_provider.dart';
 import '../models/study_mate_match.dart';
-import '../../../shared/models/user_profile.dart';
 
 class StudyMateSearchScreen extends ConsumerStatefulWidget {
   const StudyMateSearchScreen({super.key});
@@ -36,7 +36,6 @@ class _StudyMateSearchScreenState extends ConsumerState<StudyMateSearchScreen> {
   @override
   Widget build(BuildContext context) {
     final profileState = ref.watch(userProfileProvider);
-    final suggestedState = ref.watch(suggestedMatchesProvider);
     final coursesState = ref.watch(uniqueCoursesFilterProvider);
 
     final currentUser = profileState.value;
@@ -79,11 +78,35 @@ class _StudyMateSearchScreenState extends ConsumerState<StudyMateSearchScreen> {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.notifications_none_outlined, color: AppColors.textLight),
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.notifications_none_outlined, color: AppColors.textLight),
+                Consumer(
+                  builder: (context, ref, _) {
+                    final count = ref.watch(pendingRequestsCountProvider);
+                    if (count == 0) return const SizedBox();
+                    return Positioned(
+                      right: -4,
+                      top: -4,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: AppColors.error,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '$count',
+                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Notifications will be available soon!')),
-              );
+              context.push('/dashboard/matchmaking/friend-requests');
             },
           ),
         ],
@@ -96,70 +119,7 @@ class _StudyMateSearchScreenState extends ConsumerState<StudyMateSearchScreen> {
             children: [
               // 1. Filter Card
               _buildFilterCard(context, coursesState),
-              const SizedBox(height: 28),
 
-              // 2. Suggested List Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'SUGGESTED FOR YOU',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                      color: AppColors.textLight,
-                    ),
-                  ),
-                  suggestedState.when(
-                    data: (matches) => Text(
-                      '${matches.length} Partners found',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    loading: () => const SizedBox(),
-                    error: (_, __) => const SizedBox(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // 3. Suggested Matches List
-              suggestedState.when(
-                data: (matches) {
-                  if (matches.isEmpty) {
-                    return _buildEmptyState();
-                  }
-                  return ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: matches.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 14),
-                    itemBuilder: (context, index) {
-                      final match = matches[index];
-                      return _buildPartnerCard(context, match);
-                    },
-                  );
-                },
-                loading: () => const Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 40.0),
-                    child: CircularProgressIndicator(color: AppColors.primary),
-                  ),
-                ),
-                error: (err, stack) => Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 40.0),
-                    child: Text(
-                      'Error loading suggestions: $err',
-                      style: const TextStyle(color: AppColors.error),
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
@@ -250,10 +210,14 @@ class _StudyMateSearchScreenState extends ConsumerState<StudyMateSearchScreen> {
                             borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                           ),
                         ),
+                        isExpanded: true,
                         items: _semesters.map((s) {
                           return DropdownMenuItem(
                             value: s,
-                            child: Text(s == 0 ? 'All Semesters' : 'Sem $s'),
+                            child: Text(
+                              s == 0 ? 'All Semesters' : 'Sem $s',
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           );
                         }).toList(),
                         onChanged: (val) {
@@ -354,7 +318,7 @@ class _StudyMateSearchScreenState extends ConsumerState<StudyMateSearchScreen> {
                 elevation: 2,
               ),
               onPressed: () {
-                context.push('/matchmaking/results', extra: {
+                context.push('/dashboard/matchmaking/results', extra: {
                   'major': _selectedMajor,
                   'semester': _selectedSemester,
                   'course': _selectedCourse,
@@ -593,18 +557,33 @@ class _StudyMateSearchScreenState extends ConsumerState<StudyMateSearchScreen> {
   }
 }
 
-class _PartnerDetailBottomSheet extends StatelessWidget {
+class _PartnerDetailBottomSheet extends ConsumerWidget {
   final StudyMateMatch match;
 
   const _PartnerDetailBottomSheet({required this.match});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final initials = match.profile.fullName.isNotEmpty
         ? match.profile.fullName.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
         : 'M';
     final nameHash = match.profile.fullName.codeUnits.fold(0, (prev, elem) => prev + elem);
     final avatarColor = Colors.primaries[nameHash % Colors.primaries.length];
+
+    final sentStatuses = ref.watch(sentRequestStatusesProvider);
+    final friendsState = ref.watch(friendsListProvider);
+
+    // Determine button state
+    String? sentStatus;
+    bool isFriend = false;
+
+    sentStatuses.whenData((statuses) {
+      sentStatus = statuses[match.profile.id];
+    });
+
+    friendsState.whenData((friends) {
+      isFriend = friends.any((f) => f.id == match.profile.id);
+    });
 
     return SingleChildScrollView(
       child: Padding(
@@ -783,33 +762,76 @@ class _PartnerDetailBottomSheet extends StatelessWidget {
             const SizedBox(height: 32),
 
             // Call to Action
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 52),
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              onPressed: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Mengirim permintaan belajar ke ${match.profile.fullName}!'),
-                    backgroundColor: AppColors.primary,
-                  ),
-                );
-              },
-              icon: const Icon(Icons.chat_bubble_outline),
-              label: const Text(
-                'Undang Belajar Bersama',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
+            _buildActionButton(context, ref, isFriend, sentStatus),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildActionButton(BuildContext context, WidgetRef ref, bool isFriend, String? sentStatus) {
+    if (isFriend || sentStatus == 'accepted') {
+      return ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(
+          minimumSize: const Size(double.infinity, 52),
+          backgroundColor: AppColors.success,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+        onPressed: null,
+        icon: const Icon(Icons.check_circle),
+        label: const Text('Already Study Mates ✓', style: TextStyle(fontWeight: FontWeight.bold)),
+      );
+    }
+
+    if (sentStatus == 'pending') {
+      return ElevatedButton.icon(
+        style: ElevatedButton.styleFrom(
+          minimumSize: const Size(double.infinity, 52),
+          backgroundColor: Colors.grey.shade400,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+        onPressed: null,
+        icon: const Icon(Icons.hourglass_top),
+        label: const Text('Invitation Sent', style: TextStyle(fontWeight: FontWeight.bold)),
+      );
+    }
+
+    // Default: can send invite
+    return ElevatedButton.icon(
+      style: ElevatedButton.styleFrom(
+        minimumSize: const Size(double.infinity, 52),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+      onPressed: () async {
+        try {
+          await ref.read(friendRepositoryProvider).sendFriendRequest(match.profile.id);
+          ref.invalidate(sentRequestStatusesProvider);
+          if (context.mounted) {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Invitation sent to ${match.profile.fullName}!'),
+                backgroundColor: AppColors.primary,
+              ),
+            );
+          }
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to send invitation: $e'),
+                backgroundColor: AppColors.error,
+              ),
+            );
+          }
+        }
+      },
+      icon: const Icon(Icons.person_add_alt_1),
+      label: const Text('Undang Belajar Bersama', style: TextStyle(fontWeight: FontWeight.bold)),
     );
   }
 }

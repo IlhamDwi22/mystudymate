@@ -82,6 +82,19 @@ class WorkspaceMembersNotifier extends StateNotifier<AsyncValue<List<UserProfile
     }
   }
 
+  Future<void> inviteMemberById(String userId) async {
+    try {
+      await _repository.inviteMemberById(_workspaceId, userId);
+      final members = await _repository.getWorkspaceMembers(_workspaceId);
+      state = AsyncValue.data(members);
+    } catch (e) {
+      state = await AsyncValue.guard(() async {
+        return await _repository.getWorkspaceMembers(_workspaceId);
+      });
+      rethrow;
+    }
+  }
+
   Future<void> removeMember(String userId) async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {

@@ -118,71 +118,92 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
                   ],
                 ),
               ),
+              actionsPadding: const EdgeInsets.only(left: 24, right: 24, bottom: 24, top: 8),
               actions: [
-                TextButton(
-                  onPressed: isSubmitting ? null : () => Navigator.pop(context),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  onPressed: isSubmitting
-                      ? null
-                      : () async {
-                          if (formKey.currentState!.validate()) {
-                            setDialogState(() {
-                              isSubmitting = true;
-                            });
-                            try {
-                              await ref
-                                  .read(workspacesProvider.notifier)
-                                  .createWorkspace(nameController.text.trim());
-                              if (context.mounted) {
-                                Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                        'Workspace "${nameController.text.trim()}" berhasil dibuat!'),
-                                    backgroundColor: AppColors.primary,
-                                  ),
-                                );
-                              }
-                            } catch (e) {
-                              if (context.mounted) {
-                                setDialogState(() {
-                                  isSubmitting = false;
-                                });
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Gagal membuat workspace: $e'),
-                                    backgroundColor: AppColors.error,
-                                  ),
-                                );
-                              }
-                            }
-                          }
-                        },
-                  child: isSubmitting
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: const BorderSide(color: AppColors.primary),
                           ),
-                        )
-                      : const Text('Create'),
+                        ),
+                        onPressed: isSubmitting ? null : () => Navigator.pop(context),
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: isSubmitting
+                            ? null
+                            : () async {
+                                if (formKey.currentState!.validate()) {
+                                  setDialogState(() {
+                                    isSubmitting = true;
+                                  });
+                                  try {
+                                    await ref
+                                        .read(workspacesProvider.notifier)
+                                        .createWorkspace(nameController.text.trim());
+                                    if (context.mounted) {
+                                      Navigator.pop(context);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                              'Workspace "${nameController.text.trim()}" berhasil dibuat!'),
+                                          backgroundColor: AppColors.primary,
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      setDialogState(() {
+                                        isSubmitting = false;
+                                      });
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Gagal membuat workspace: $e'),
+                                          backgroundColor: AppColors.error,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                }
+                              },
+                        child: isSubmitting
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text(
+                                'Create',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             );
@@ -268,20 +289,22 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
-        icon: const Icon(Icons.add, size: 24),
-        label: const Text(
-          'Create Workspace',
-          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
-        ),
-        onPressed: () => _showCreateWorkspaceDialog(context),
-      ),
+      floatingActionButton: workspacesState.value?.isNotEmpty == true
+          ? FloatingActionButton.extended(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 4,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              icon: const Icon(Icons.add, size: 24),
+              label: const Text(
+                'Create Workspace',
+                style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
+              ),
+              onPressed: () => _showCreateWorkspaceDialog(context),
+            )
+          : null,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -553,7 +576,7 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              isDatabaseEmpty ? 'Belum Ada Workspace' : 'Workspace Tidak Ditemukan',
+              isDatabaseEmpty ? 'No Workspace Yet' : 'Workspace Not Found',
               style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -563,8 +586,8 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
             const SizedBox(height: 8),
             Text(
               isDatabaseEmpty
-                  ? 'Mulai buat workspace pertamamu untuk berkolaborasi dan melacak tugas kelompok.'
-                  : 'Coba periksa kata kunci pencarianmu atau buat workspace baru.',
+                  ? 'Start creating your first workspace to collaborate and track group tasks.'
+                  : 'Try checking your search keyword or create a new workspace.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
@@ -577,10 +600,14 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(200, 56),
                   backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
                 ),
                 onPressed: () => _showCreateWorkspaceDialog(context),
                 icon: const Icon(Icons.add),
-                label: const Text('Buat Workspace'),
+                label: const Text(
+                  'Create Workspace',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
           ],
         ),

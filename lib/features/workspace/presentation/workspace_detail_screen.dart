@@ -7,6 +7,8 @@ import '../../../shared/models/user_profile.dart';
 import '../providers/workspace_detail_provider.dart';
 import '../providers/workspace_provider.dart';
 import '../../profile/providers/profile_provider.dart';
+import '../../matchmaking/providers/friend_provider.dart';
+import '../../matchmaking/models/friend_models.dart';
 import 'task_detail_screen.dart';
 import 'edit_task_screen.dart';
 
@@ -50,111 +52,10 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> w
   }
 
   void _showInviteMemberDialog(BuildContext context) {
-    final formKey = GlobalKey<FormState>();
-    final nameController = TextEditingController();
-    bool isSubmitting = false;
-
     showDialog(
       context: context,
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setStateDialog) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              title: const Text(
-                'Undang Anggota',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              content: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Masukkan nama lengkap mahasiswa yang ingin diundang:',
-                      style: TextStyle(fontSize: 14, color: AppColors.textLight),
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: nameController,
-                      autofocus: true,
-                      decoration: const InputDecoration(
-                        hintText: 'Nama lengkap...',
-                        prefixIcon: Icon(Icons.person_outline),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Nama tidak boleh kosong';
-                        }
-                        return null;
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: isSubmitting ? null : () => Navigator.pop(context),
-                  child: const Text('Batal'),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                  ),
-                  onPressed: isSubmitting
-                      ? null
-                      : () async {
-                          if (formKey.currentState!.validate()) {
-                            final navigator = Navigator.of(context);
-                            final scaffoldMessenger = ScaffoldMessenger.of(context);
-                            final name = nameController.text.trim();
-                            setStateDialog(() {
-                              isSubmitting = true;
-                            });
-                            try {
-                              await ref
-                                  .read(workspaceMembersProvider(widget.workspace.id).notifier)
-                                  .inviteMember(name);
-                              
-                              // Trigger reload of workspace list to update member counts
-                              ref.invalidate(workspacesProvider);
-
-                              navigator.pop();
-                              scaffoldMessenger.showSnackBar(
-                                SnackBar(
-                                  content: Text('Berhasil mengundang $name'),
-                                  backgroundColor: AppColors.success,
-                                ),
-                              );
-                            } catch (e) {
-                              setStateDialog(() {
-                                isSubmitting = false;
-                              });
-                              scaffoldMessenger.showSnackBar(
-                                SnackBar(
-                                  content: Text(e.toString().replaceAll('Exception:', '')),
-                                  backgroundColor: AppColors.error,
-                                ),
-                              );
-                            }
-                          }
-                        },
-                  child: isSubmitting
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                        )
-                      : const Text('Undang'),
-                ),
-              ],
-            );
-          },
-        );
+        return _InviteMemberDialog(workspaceId: widget.workspace.id);
       },
     );
   }
@@ -818,5 +719,189 @@ class _WorkspaceDetailScreenState extends ConsumerState<WorkspaceDetailScreen> w
         ],
       ),
     );
+  }
+}
+
+class _InviteMemberDialog extends ConsumerStatefulWidget {
+  final String workspaceId;
+
+  const _InviteMemberDialog({required this.workspaceId});
+
+  @override
+  ConsumerState<_InviteMemberDialog> createState() => _InviteMemberDialogState();
+}
+
+class _InviteMemberDialogState extends ConsumerState<_InviteMemberDialog> {
+  bool isSubmitting = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final friendsState = ref.watch(friendsListProvider);
+    final workspaceMembers = ref.watch(workspaceMembersProvider(widget.workspaceId));
+
+    return AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      title: const Text(
+        'Undang Teman',
+        style: TextStyle(fontWeight: FontWeight.bold),
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Pilih teman yang ingin diundang:',
+              style: TextStyle(fontSize: 14, color: AppColors.textLight),
+            ),
+            const SizedBox(height: 16),
+            Flexible(
+              child: friendsState.when(
+                data: (friends) {
+                  if (friends.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: Center(
+                        child: Text(
+                          'Kamu belum memiliki teman.\nSilakan cari di halaman Find Study Mate.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: AppColors.textLight, fontSize: 13),
+                        ),
+                      ),
+                    );
+                  }
+
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: friends.length,
+                    separatorBuilder: (_, __) => const Divider(),
+                    itemBuilder: (context, index) {
+                      final friend = friends[index];
+
+                      // Check if already a member
+                      bool isMember = false;
+                      workspaceMembers.whenData((members) {
+                        isMember = members.any((m) => m.id == friend.id);
+                      });
+
+                      final initials = friend.fullName.isNotEmpty
+                          ? friend.fullName.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
+                          : 'U';
+
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: CircleAvatar(
+                          backgroundColor: AppColors.primary.withAlpha(25),
+                          child: Text(
+                            initials,
+                            style: const TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          friend.fullName,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        subtitle: Text(
+                          friend.major,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        trailing: isMember
+                            ? const Text(
+                                'Terdaftar',
+                                style: TextStyle(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.bold),
+                              )
+                            : isSubmitting
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : TextButton(
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: AppColors.primary,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(20),
+                                        side: const BorderSide(color: AppColors.primary),
+                                      ),
+                                    ),
+                                    onPressed: () => _inviteFriend(friend),
+                                    child: const Text('Undang', style: TextStyle(fontSize: 12)),
+                                  ),
+                      );
+                    },
+                  );
+                },
+                loading: () => const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: CircularProgressIndicator(),
+                  ),
+                ),
+                error: (err, _) => Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text('Error: $err'),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Tutup'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _inviteFriend(FriendProfile friend) async {
+    setState(() {
+      isSubmitting = true;
+    });
+
+    final navigator = Navigator.of(context);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    try {
+      await ref
+          .read(workspaceMembersProvider(widget.workspaceId).notifier)
+          .inviteMemberById(friend.id);
+      
+      ref.invalidate(workspacesProvider);
+
+      if (mounted) {
+        setState(() {
+          isSubmitting = false;
+        });
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text('Berhasil mengundang ${friend.fullName}'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isSubmitting = false;
+        });
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceAll('Exception:', '')),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 }
